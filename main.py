@@ -1,14 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from analyzer.metrics_builder import analyze_code
 import requests
 import logging
 import json
 import ai_engine
 
 # --- IMPORT YOUR MODULES ---
-# These are the files (database.py, models.py, schemas.py) 
-# that must exist in your folder.
 import models
 import schemas
 from database import engine, get_db
@@ -18,7 +17,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DevMirror-Hub")
 
 # --- CREATE DATABASE TABLES ---
-# This automatically creates "devmirror.db" if it doesn't exist.
 models.Base.metadata.create_all(bind=engine)
 
 # --- INITIALIZE APP ---
@@ -34,21 +32,14 @@ app.add_middleware(
 )
 
 # --- CONFIG: TEAMMATE URLS ---
-# Rohan's Engine (Port 8002)
 PATTERN_ENGINE_URL = "http://127.0.0.1:8003/analyze_behavior"
-# Dhruv's Engine (Port 8001) - Assumed
 CODE_ENGINE_URL = "http://127.0.0.1:8001/analyze_code"
 
 
 # --- HELPER: SAFE REQUEST ---
 def safe_post_request(url: str, payload: dict, default_response: dict):
-    """
-    Tries to call a teammate's service.
-    If they are offline, returns the default_response so we don't crash.
-    """
     try:
         logger.info(f"📡 Calling: {url}")
-        # Short timeout (2s) so the demo stays fast
         response = requests.post(url, json=payload, timeout=2)
         if response.status_code == 200:
             return response.json()
@@ -62,49 +53,54 @@ def safe_post_request(url: str, payload: dict, default_response: dict):
 
 
 # --- MAIN ENDPOINT ---
-# REPLACE YOUR EXISTING analyze_dev_mirror FUNCTION WITH THIS:
 @app.post("/analyze", response_model=schemas.AnalysisResponse)
 def analyze_dev_mirror(request: schemas.AnalysisRequest, db: Session = Depends(get_db)):
     logger.info(f"⚡ Analysis requested for user: {request.user_id}")
 
-    # 1. Call Dhruv (Code Engine) - Keep as is
-    code_result = safe_post_request(
-        CODE_ENGINE_URL,
-        {"code": request.code_snapshot},
-        default_response={"complexity": 0, "bad_patterns": ["Simulated: Service Offline"]}
-    )
-
-    # 2. Call Rohan (Pattern Engine) - FIXED PAYLOAD
+    # --- 1. DHRUV'S REAL CODE ENGINE ---
+    code_result = analyze_code(request.code_snapshot)
+    
+    # Safety Net: If Dhruv's code crashes, give it a default empty dictionary
+    if not code_result:
+        code_result = {}
+        
+    print("🚨 RAW DHRUV RESULT:", code_result)
+    
+    # ⚡ THE FIX: Map Dhruv's exact keys so the UI and AI can read them!
+    actual_complexity = code_result.get("cyclomatic_complexity", 0)
+    actual_insights = code_result.get("insights", [])
+    
+    # We inject both names into the dictionary to guarantee Streamlit finds it
+    code_result["complexity"] = actual_complexity
+    code_result["cyclomatic_complexity"] = actual_complexity
+    code_result["bad_patterns"] = actual_insights
+    
+    # --- 2. Call Rohan (Pattern Engine) ---
     logs_data = [log.dict() for log in request.logs]
     
-    # --- FIX START: We now include user_id and session_id ---
     rohan_payload = {
         "user_id": request.user_id,
-        "session_id": "demo_session_1",  # Dummy ID for the demo
+        "session_id": "demo_session_1",  
         "logs": logs_data
     }
-    # --- FIX END ---
 
     pattern_result = safe_post_request(
         PATTERN_ENGINE_URL,
-        rohan_payload,  # Sending the fixed payload
+        rohan_payload,  
         default_response={"thinking_style": "Unknown (Fallback)", "confidence": 0.0, "debug_loop": False}
     )
 
-   # 3. Generate AI Reflection (REAL AI)
-    # We pass the real data to Gemini
-    complexity = code_result.get("complexity", 0)
-    bad_patterns = code_result.get("bad_patterns", [])
+    # --- 3. Generate AI Reflection (REAL AI) ---
     style = pattern_result.get("thinking_style", "Unknown")
 
     reflection_text = ai_engine.get_ai_reflection(
         code_snapshot=request.code_snapshot,
         thinking_style=style,
-        complexity=complexity,
-        errors=bad_patterns
+        complexity=actual_complexity, # Now passing the real mapped number!
+        errors=actual_insights        # Now passing Dhruv's real insights!
     )
 
-    # 4. Save to Database
+    # --- 4. Save to Database ---
     db_record = models.AnalysisResult(
         user_id=request.user_id,
         code_metrics=code_result,
