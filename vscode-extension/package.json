@@ -1,0 +1,23 @@
+{
+  "name": "berserkers",
+  "displayName": "devmirror",
+  "description": "Tracks Coding Behaviour",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "Berserkers.helloWorld",
+        "title": "Hello World"
+      },
+      {
+        "command": "devmirror.showSummary",
+        "title": "DevMirror: Show Session Summary"
+      }
+    ]
+  }
+}
