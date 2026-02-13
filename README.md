@@ -38,3 +38,67 @@ Want to run DevMirror on your own machine? Follow these simple steps.
 
 ### 1. Clone the Repository
 ```bash
+"git clone https://github.com/Mohit25f101/Dev-Mirror.git
+cd Dev-Mirror
+2. Set Up the Python Environment
+We recommend using a virtual environment.
+
+Bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+3. Install Dependencies
+Install the required libraries for the backend, AI, and code engines:
+
+Bash
+pip install fastapi uvicorn sqlalchemy requests streamlit radon google-generativeai
+4. Configure the AI Brain
+You need a Google Gemini API key to run the AI insights.
+
+Create a .env file in the root directory.
+
+Add your key: GEMINI_API_KEY=your_api_key_here
+
+🏃‍♂️ How to Run the Project
+DevMirror requires three lightweight services to run simultaneously, plus the VS Code extension. Open three separate terminal windows in the root project folder.
+
+Terminal 1: Start the Master Backend (Orchestrator)
+This starts the main FastAPI server that handles the database and AI routing.
+
+Bash
+uvicorn main:app --reload --port 8000
+Terminal 2: Start the Pattern Engine
+This starts the behavioral analysis microservice.
+
+Bash
+cd pattern_engine
+uvicorn main:app --reload --port 8003
+Terminal 3: Start the Live UI Dashboard
+This launches the Streamlit frontend. It will automatically open in your web browser.
+
+Bash
+streamlit run Frontend/dashboard.py
+Terminal 4: Launch the VS Code Extension
+Open the vscode-extension folder in a new VS Code window.
+
+Press F5 on your keyboard (or click Run > Start Debugging).
+
+A new "Extension Development Host" window will pop up.
+
+In this new window, open any Python file (e.g., test.py), write some code, and press Save (Ctrl+S).
+
+Watch the Streamlit Dashboard instantly light up with your code metrics and AI insights!
+
+👥 The Team
+Built with ❤️ during the Hackathon by:
+
+Mohit - Backend Architecture & AI Orchestration
+
+Gagan - UI Dashboard & VS Code Extension Bridge
+
+Dhruv - AST Code Analysis Engine
+
+Rohan - Behavioral Pattern Engine
+
+
+### 🏆 You are done!
+Paste that in, and your DevMirror project is 100% complete
